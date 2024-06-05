@@ -99,6 +99,56 @@ class DC_and_BCE_loss(nn.Module):
         return result
 
 
+class DC_and_MSE_loss(nn.Module):
+    def __init__(self, mse_kwargs, soft_dice_kwargs, weight_mse=1, weight_dice=0, use_ignore_label: bool = False,
+                 dice_class=MemoryEfficientSoftDiceLoss):
+        """
+        DO NOT APPLY NONLINEARITY IN YOUR NETWORK!
+
+        target must be one hot encoded for Dice loss
+        IMPORTANT: We assume use_ignore_label is located in target[:, -1]!!!
+
+        :param mse_kwargs: Arguments for MSE loss
+        :param soft_dice_kwargs: Arguments for Dice loss
+        :param weight_mse: Weight for MSE loss
+        :param weight_dice: Weight for Dice loss
+        :param use_ignore_label: Boolean indicating whether to use ignore label
+        :param dice_class: Dice loss class
+        """
+        super(DC_and_MSE_loss, self).__init__()
+        if use_ignore_label:
+            mse_kwargs['reduction'] = 'none'
+
+        self.weight_dice = weight_dice
+        self.weight_mse = weight_mse
+        self.use_ignore_label = use_ignore_label
+
+        self.mse = MemoryEfficientMSELoss(**mse_kwargs)
+        self.dc = dice_class(apply_nonlin=torch.sigmoid, **soft_dice_kwargs)
+
+    def forward(self, net_output: torch.Tensor, target: torch.Tensor):
+        if self.use_ignore_label:
+            # target is one hot encoded here. invert it so that it is True wherever we can compute the loss
+            if target.dtype == torch.bool:
+                mask = ~target[:, -1:]
+            else:
+                mask = (1 - target[:, -1:]).bool()
+            # remove ignore channel now that we have the mask
+            target_regions = target[:, :-1]
+        else:
+            target_regions = target
+            mask = None
+
+        dc_loss = self.dc(net_output, target_regions, loss_mask=mask)
+        target_regions = target_regions.float()
+        if mask is not None:
+            mse_loss = (self.mse(net_output, target_regions) * mask).sum() / torch.clip(mask.sum(), min=1e-8)
+        else:
+            mse_loss = self.mse(net_output, target_regions)
+        result = self.weight_mse * mse_loss + self.weight_dice * dc_loss
+        return result
+
+
 class DC_and_topk_loss(nn.Module):
     def __init__(self, soft_dice_kwargs, ce_kwargs, weight_ce=1, weight_dice=1, ignore_label=None):
         """

@@ -119,6 +119,41 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         return -dc
 
 
+class MemoryEfficientMSELoss(nn.Module):
+    def __init__(self, apply_nonlin: Callable = None, batch_mse: bool = False, ddp: bool = True):
+        super(MemoryEfficientMSELoss, self).__init__()
+
+        self.apply_nonlin = apply_nonlin
+        self.batch_mse = batch_mse
+        self.ddp = ddp
+
+    def forward(self, x, y, loss_mask=None):
+        if self.apply_nonlin is not None:
+            x = self.apply_nonlin(x)
+
+        assert x.shape == y.shape, "Prediction and target must have the same shape"
+
+        if loss_mask is not None:
+            x = x * loss_mask
+            y = y * loss_mask
+
+        mse = (x - y) ** 2
+        if loss_mask is not None:
+            mse = mse * loss_mask
+
+        axes = tuple(range(2, x.ndim))
+        mse = mse.sum(axes)
+
+        if self.batch_mse:
+            if self.ddp:
+                mse = AllGatherGrad.apply(mse).sum(0)
+
+            mse = mse.sum(0)
+
+        mse = mse.mean()
+        return mse
+
+
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):
     """
     net_output must be (b, c, x, y(, z)))

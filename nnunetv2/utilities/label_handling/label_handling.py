@@ -65,6 +65,12 @@ class LabelManager(object):
             # ignore label is not going to be used, hence the name. Duh.
             if k == 'ignore':
                 continue
+
+            if k == 'continues':
+                all_labels = []
+                for i in np.arange(0.00, 100.01, 0.01):
+                    all_labels.append(float(i)) 
+
             if isinstance(r, (tuple, list)):
                 for ri in r:
                     all_labels.append(int(ri))

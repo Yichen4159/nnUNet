@@ -2,13 +2,13 @@ import numpy as np
 from nnunetv2.training.dataloading.base_data_loader import nnUNetDataLoaderBase
 from nnunetv2.training.dataloading.nnunet_dataset import nnUNetDataset
 
-
 class nnUNetDataLoader2D(nnUNetDataLoaderBase):
     def generate_train_batch(self):
         selected_keys = self.get_indices()
-        # preallocate memory for data and seg
+        # preallocate memory for data, seg, and dose
         data_all = np.zeros(self.data_shape, dtype=np.float32)
-        seg_all = np.zeros(self.seg_shape, dtype=np.int16)
+        seg_all = np.zeros(self.seg_shape, dtype=np.float32)
+        # dose_all = np.zeros(self.seg_shape, dtype=np.float32) # Added dose channel
         case_properties = []
 
         for j, current_key in enumerate(selected_keys):
@@ -83,9 +83,11 @@ class nnUNetDataLoader2D(nnUNetDataLoaderBase):
             padding = [(-min(0, bbox_lbs[i]), max(bbox_ubs[i] - shape[i], 0)) for i in range(dim)]
             data_all[j] = np.pad(data, ((0, 0), *padding), 'constant', constant_values=0)
             seg_all[j] = np.pad(seg, ((0, 0), *padding), 'constant', constant_values=-1)
+            # dose_all[j] = np.pad(seg, ((0, 0), *padding), 'constant', constant_values=-1) # Padding dose like seg
 
         return {'data': data_all, 'seg': seg_all, 'properties': case_properties, 'keys': selected_keys}
 
+        # 'dose': dose_all, 
 
 if __name__ == '__main__':
     folder = '/media/fabian/data/nnUNet_preprocessed/Dataset004_Hippocampus/2d'
