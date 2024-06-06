@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class LabelManager(object):
-    def __init__(self, label_dict: dict, regions_class_order: Union[List[int], None], force_use_labels: bool = False,
+    def __init__(self, label_dict: dict, regions_class_order: Union[List[int], None], force_use_labels: bool = True,
                  inference_nonlin=None):
         self._sanity_check(label_dict)
         self.label_dict = label_dict
@@ -65,12 +65,6 @@ class LabelManager(object):
             # ignore label is not going to be used, hence the name. Duh.
             if k == 'ignore':
                 continue
-
-            if k == 'continues':
-                all_labels = []
-                for i in np.arange(0.00, 100.01, 0.01):
-                    all_labels.append(float(i)) 
-
             if isinstance(r, (tuple, list)):
                 for ri in r:
                     all_labels.append(int(ri))
